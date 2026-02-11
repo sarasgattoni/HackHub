@@ -4,6 +4,7 @@ import it.hackhub.model.enums.ChatParticipantType;
 import it.hackhub.model.enums.RequestState;
 import it.hackhub.model.enums.StaffRole;
 import it.hackhub.model.valueobjs.Email;
+import it.hackhub.model.valueobjs.GitHubUrl;
 import it.hackhub.model.valueobjs.UserPassword;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +16,7 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("Test Suite Completa: Rich Domain (45 Test)")
+@DisplayName("Test Suite Completa: Rich Domain (47 Test)")
 class RichDomainTest {
 
     private User dummyLeader;
@@ -23,6 +24,7 @@ class RichDomainTest {
     private User dummyNewUser;
     private StaffProfile dummyJudge;
     private StaffProfile dummyMentor;
+    private Admin dummyAdmin;
     private Team dummyTeam;
     private Hackathon dummyHackathon;
 
@@ -43,6 +45,9 @@ class RichDomainTest {
 
         dummyMentor = new StaffProfile("Luigi", "Verdi", new Email("mentor@hackhub.it"), pwd, StaffRole.MENTOR);
         dummyMentor.setId(4L);
+
+        dummyAdmin = new Admin(new Email("admin@hackhub.it"), pwd);
+        dummyAdmin.setId(999L);
 
         dummyTeam = new Team("Alpha", dummyLeader);
         dummyHackathon = new Hackathon();
@@ -257,7 +262,7 @@ class RichDomainTest {
     }
 
     @Nested
-    @DisplayName("5. Test Invarianti: Submission (8 Test)")
+    @DisplayName("5. Test Invarianti: Submission con GitHubUrl (9 Test)")
     class SubmissionTests {
         private Submission submission;
 
@@ -267,10 +272,25 @@ class RichDomainTest {
         }
 
         @Test
-        @DisplayName("L'update sovrascrive il contenuto")
-        void testUpdateChangesContent() {
-            submission.update("Bozza");
-            assertEquals("Bozza", submission.getContent());
+        @DisplayName("L'update sovrascrive l'URL GitHub")
+        void testUpdateChangesGitHubUrl() {
+            GitHubUrl url1 = new GitHubUrl("https://github.com/team/repo1");
+            submission.update(url1);
+            assertEquals(url1, submission.getRepositoryUrl());
+
+            GitHubUrl url2 = new GitHubUrl("https://github.com/team/repo2");
+            submission.update(url2);
+            assertEquals(url2, submission.getRepositoryUrl());
+        }
+
+        @Test
+        @DisplayName("L'update viene bloccato se la sottomissione è già stata valutata")
+        void testUpdateFailsIfAlreadyEvaluated() {
+            submission.evaluate(80, "Ottimo lavoro", dummyJudge);
+
+            GitHubUrl newUrl = new GitHubUrl("https://github.com/team/repo-nuovo");
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> submission.update(newUrl));
+            assertTrue(ex.getMessage().toLowerCase().contains("già valutata"));
         }
 
         @Test
@@ -324,7 +344,7 @@ class RichDomainTest {
     }
 
     @Nested
-    @DisplayName("6. Test Ereditarietà: Account e Security (3 Test)")
+    @DisplayName("6. Test Ereditarietà: Account e Security (4 Test)")
     class AccountTests {
         @Test
         @DisplayName("Controllo password corretto su User")
@@ -342,6 +362,12 @@ class RichDomainTest {
         @DisplayName("Controllo password polimorfico funziona anche su StaffProfile")
         void testStaffPasswordSuccess() {
             assertTrue(dummyJudge.checkPassword("SecurePass123!"));
+        }
+
+        @Test
+        @DisplayName("Controllo password polimorfico funziona anche su Admin")
+        void testAdminPasswordSuccess() {
+            assertTrue(dummyAdmin.checkPassword("SecurePass123!"));
         }
     }
 
@@ -404,15 +430,14 @@ class RichDomainTest {
             java.lang.reflect.Field field = null;
             Class<?> currentClass = req.getClass();
 
-            // Cerca il campo salendo nella gerarchia delle classi (supporta l'ereditarietà)
             while (currentClass != null && field == null) {
                 try {
-                    field = currentClass.getDeclaredField("status"); // Prova col nome "status"
+                    field = currentClass.getDeclaredField("status");
                 } catch (NoSuchFieldException e1) {
                     try {
-                        field = currentClass.getDeclaredField("state"); // Se fallisce, prova col nome "state"
+                        field = currentClass.getDeclaredField("state");
                     } catch (NoSuchFieldException e2) {
-                        currentClass = currentClass.getSuperclass(); // Se falliscono entrambi, passa alla superclasse
+                        currentClass = currentClass.getSuperclass();
                     }
                 }
             }
@@ -421,9 +446,8 @@ class RichDomainTest {
                 fail("Impossibile trovare il campo 'status' o 'state' in HackathonRequest o nelle sue superclassi.");
             }
 
-            field.setAccessible(true); // Forza l'accesso al campo privato/protetto
+            field.setAccessible(true);
 
-            // Usiamo Object e poi .toString() per supportare sia String che Enum (RequestState)
             Object actualStatus = field.get(req);
 
             assertEquals("PENDING", actualStatus.toString(), "HackathonRequest deve nascere in stato PENDING");

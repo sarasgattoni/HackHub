@@ -53,18 +53,18 @@ public class Hackathon {
 
     public void assertIsOpenForSubscription() {
         if (this.subscriptionStartDate == null || this.subscriptionEndDate == null) {
-            throw new IllegalStateException("Le date di iscrizione non sono state definite.");
+            throw new IllegalStateException("Subscription dates haven't been set");
         }
 
         java.time.LocalDate now = java.time.LocalDate.now();
         if (now.isBefore(this.subscriptionStartDate) || now.isAfter(this.subscriptionEndDate)) {
-            throw new IllegalStateException("L'Hackathon non è attualmente aperto alle iscrizioni.");
+            throw new IllegalStateException("Hackathon is currently closed to subscriptions");
         }
     }
 
     public void assertApprovedOrSubscription() {
         if (this.executionStartDate != null && java.time.LocalDate.now().isAfter(this.executionStartDate)) {
-            throw new IllegalStateException("Impossibile modificare i ruoli: l'Hackathon è già in esecuzione o concluso.");
+            throw new IllegalStateException("Impossible to change roles, hackathon has already started");
         }
     }
 }

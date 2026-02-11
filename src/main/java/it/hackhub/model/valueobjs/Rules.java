@@ -14,20 +14,20 @@ public class Rules {
     @Column(nullable = false)
     private int maxTeamMembers;
 
-    @Column(name = "rulesDocumentPath", nullable = false)
-    private String rulesDocument;
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String rulesText;
 
-    public Rules(int maxTeamMembers, String rulesDocument) {
+    public Rules(int maxTeamMembers, String rulesText) {
 
         if (maxTeamMembers <= 0) {
-            throw new IllegalArgumentException("Max members must be positive");
+            throw new IllegalArgumentException("Maximum team members number must be positive");
         }
 
-        if (rulesDocument == null || rulesDocument.trim().isEmpty()) {
-            throw new IllegalArgumentException("Rules document path cannot be null or empty");
+        if (rulesText == null || rulesText.isBlank()) {
+            throw new IllegalArgumentException("Rules can't be blank");
         }
 
         this.maxTeamMembers = maxTeamMembers;
-        this.rulesDocument = rulesDocument;
+        this.rulesText = rulesText;
     }
 }

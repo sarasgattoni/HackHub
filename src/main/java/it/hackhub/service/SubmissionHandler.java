@@ -2,6 +2,7 @@ package it.hackhub.service;
 
 import it.hackhub.model.*;
 import it.hackhub.model.utils.HibernateExecutor;
+import it.hackhub.model.valueobjs.GitHubUrl;
 import it.hackhub.repository.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,7 +47,7 @@ public class SubmissionHandler {
         });
     }
 
-    public void sendSubmission(Long hackathonId, Long deliveryId, Long userId, String content) {
+    public void sendSubmission(Long hackathonId, Long deliveryId, Long userId, String githubUrlString) {
         HibernateExecutor.executeVoidTransaction(session -> {
             Hackathon hackathon = hackathonRepo.findById(session, hackathonId)
                     .orElseThrow(() -> new IllegalArgumentException("Hackathon not found"));
@@ -59,27 +60,29 @@ public class SubmissionHandler {
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
             Team team = teamRepo.getTeamOfUser(session, userId)
-                    .orElseThrow(() -> new IllegalStateException("User without team"));
+                    .orElseThrow(() -> new IllegalStateException("User does not have team"));
 
             if (!team.isLeader(user)) {
-                throw new IllegalStateException("Only the team leader can submit solutions");
+                throw new IllegalStateException("Only the team leader can send submissions");
             }
 
             ParticipatingTeam pt = partTeamRepo.findByTeamAndHackathon(session, team.getId(), hackathonId)
-                    .orElseThrow(() -> new IllegalStateException("Team does not participate in the hackathon"));
+                    .orElseThrow(() -> new IllegalStateException("Team does not participate to this hackathon"));
 
             Delivery delivery = deliveryRepo.findById(session, deliveryId)
                     .orElseThrow(() -> new IllegalArgumentException("Delivery not found"));
+
+            GitHubUrl url = new GitHubUrl(githubUrlString);
 
             Optional<Submission> existing = submissionRepo.getByDeliveryAndTeam(session, deliveryId, pt.getId());
 
             if (existing.isPresent()) {
                 Submission sub = existing.get();
-                sub.update(content);
+                sub.update(url);
                 submissionRepo.save(session, sub);
             } else {
                 Submission sub = new Submission(pt, delivery);
-                sub.update(content);
+                sub.update(url);
                 submissionRepo.save(session, sub);
             }
         });

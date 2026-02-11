@@ -1,5 +1,6 @@
 package it.hackhub.model;
 
+import it.hackhub.model.valueobjs.GitHubUrl;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,8 +20,15 @@ public class Submission {
     @ManyToOne(optional = false)
     private Delivery delivery;
 
-    @Lob
-    private String content;
+    @Embedded
+    private GitHubUrl repositoryUrl;
+
+    public void update(GitHubUrl url) {
+        if (this.score != null) {
+            throw new IllegalStateException("Non puoi aggiornare una sottomissione già valutata");
+        }
+        this.repositoryUrl = url;
+    }
 
     private Integer score;
     private String writtenEvaluation;
@@ -31,10 +39,6 @@ public class Submission {
     public Submission(ParticipatingTeam pt, Delivery d) {
         this.participatingTeam = pt;
         this.delivery = d;
-    }
-
-    public void update(String content) {
-        this.content = content;
     }
 
     public void evaluate(Integer score, String writtenEvaluation, StaffProfile judge) {
