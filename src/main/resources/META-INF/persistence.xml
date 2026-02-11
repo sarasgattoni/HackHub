@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence" version="3.0">
+    <persistence-unit name="hackhub-pu">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <class>it.hackhub.model.Hackathon</class>
+        <class>it.hackhub.model.Delivery</class>
+        <class>it.hackhub.model.FlagDelivery</class>
+        <class>it.hackhub.model.StandardDelivery</class>
+        <class>it.hackhub.model.StaffProfile</class>
+        <class>it.hackhub.model.HackathonRequest</class>
+
+        <properties>
+            <property name="jakarta.persistence.jdbc.driver" value="com.mysql.cj.jdbc.Driver"/>
+            <property name="jakarta.persistence.jdbc.url" value="jdbc:mysql://localhost:3306/hackhub"/>
+            <property name="jakarta.persistence.jdbc.user" value="root"/>
+            <property name="jakarta.persistence.jdbc.password" value="password"/>
+            <property name="hibernate.hbm2ddl.auto" value="update"/>
+            <property name="hibernate.show_sql" value="true"/>
+        </properties>
+    </persistence-unit>
+</persistence>
