@@ -2,13 +2,13 @@ package it.hackhub.service;
 
 import it.hackhub.model.*;
 import it.hackhub.model.enums.RequestState;
+import it.hackhub.model.enums.ResponseType;
 import it.hackhub.model.enums.StaffRole;
 import it.hackhub.model.utils.HibernateExecutor;
-import it.hackhub.model.valueobjs.Email;
-import it.hackhub.model.valueobjs.GitHubUrl;
-import it.hackhub.model.valueobjs.UserPassword;
+import it.hackhub.model.valueobjs.*;
 import it.hackhub.repository.*;
 import org.hibernate.Session;
+import org.hibernate.query.Query;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -17,6 +17,10 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,6 +46,7 @@ class ServiceHandlersTest {
 
     @BeforeEach
     void globalSetup() {
+
         mockedExecutor = mockStatic(HibernateExecutor.class);
 
         mockedExecutor.when(() -> HibernateExecutor.executeVoidTransaction(any())).thenAnswer(inv -> {
@@ -105,7 +110,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Successo: Il leader iscrive il team all'Hackathon aperto")
+        @DisplayName("Success: Leader joins an open Hackathon")
         void testJoinSuccess() {
             dummyHackathon.setSubscriptionStartDate(LocalDate.now().minusDays(1));
             dummyHackathon.setSubscriptionEndDate(LocalDate.now().plusDays(1));
@@ -120,14 +125,14 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Limite: Iscrizione fallisce se l'Hackathon non esiste")
+        @DisplayName("Fail: Hackathon does not exist")
         void testJoinHackathonNotFound() {
             when(mockHackRepo.constructed().get(0).findById(mockSession, 999L)).thenReturn(Optional.empty());
             assertThrows(IllegalArgumentException.class, () -> handler.joinHackathon(1L, 999L));
         }
 
         @Test
-        @DisplayName("Limite: Iscrizione fallisce se l'Hackathon ha le iscrizioni chiuse")
+        @DisplayName("Fail: Hackathon subscriptions are closed")
         void testJoinHackathonClosed() {
             dummyHackathon.setSubscriptionStartDate(LocalDate.now().minusDays(10));
             dummyHackathon.setSubscriptionEndDate(LocalDate.now().minusDays(1));
@@ -137,7 +142,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Sicurezza: Iscrizione fallisce se l'utente non è il leader")
+        @DisplayName("Security: Fail if user is not the Team Leader")
         void testJoinNotLeader() {
             dummyHackathon.setSubscriptionStartDate(LocalDate.now().minusDays(1));
             dummyHackathon.setSubscriptionEndDate(LocalDate.now().plusDays(1));
@@ -150,7 +155,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Business Rule: Iscrizione fallisce se il team supera la capienza massima")
+        @DisplayName("Business Rule: Fail if team size exceeds limit")
         void testJoinTeamTooBig() {
             dummyHackathon.setSubscriptionStartDate(LocalDate.now().minusDays(1));
             dummyHackathon.setSubscriptionEndDate(LocalDate.now().plusDays(1));
@@ -166,7 +171,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Business Rule: Iscrizione fallisce se il team è già iscritto")
+        @DisplayName("Business Rule: Fail if team is already participating")
         void testJoinAlreadyParticipating() {
             dummyHackathon.setSubscriptionStartDate(LocalDate.now().minusDays(1));
             dummyHackathon.setSubscriptionEndDate(LocalDate.now().plusDays(1));
@@ -182,7 +187,7 @@ class ServiceHandlersTest {
     }
 
     @Nested
-    @DisplayName("2. RoleHandler Tests (Nomine e Assegnazioni)")
+    @DisplayName("2. RoleHandler Tests (Nominations & Assignments)")
     class RoleHandlerTests {
         private MockedConstruction<StaffProfileRepository> mockStaffRepo;
         private MockedConstruction<HackathonRepository> mockHackRepo;
@@ -208,10 +213,10 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Successo: L'organizzatore invia una richiesta di ruolo (Mentore)")
+        @DisplayName("Success: Organizer sends a Role Request")
         void testSendRoleRequestSuccess() {
             dummyHackathon.setExecutionStartDate(LocalDate.now().plusDays(5));
-            StaffProfile target = new StaffProfile("Nuovo", "Mentore", new Email("new@h.it"), null, StaffRole.MENTOR);
+            StaffProfile target = new StaffProfile("New", "Mentor", new Email("new@h.it"), null, StaffRole.MENTOR);
 
             when(mockStaffRepo.constructed().get(0).findById(mockSession, 5L)).thenReturn(Optional.of(dummyOrg));
             when(mockStaffRepo.constructed().get(0).findByEmail(mockSession, "new@h.it")).thenReturn(Optional.of(target));
@@ -225,9 +230,9 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Sicurezza: Invio fallisce se chi richiede NON è l'organizzatore")
+        @DisplayName("Security: Fail if requester is NOT the Organizer")
         void testSendRoleRequestNotOrganizer() {
-            StaffProfile target = new StaffProfile("Nuovo", "Mentore", new Email("new@h.it"), null, StaffRole.MENTOR);
+            StaffProfile target = new StaffProfile("New", "Mentor", new Email("new@h.it"), null, StaffRole.MENTOR);
 
             when(mockStaffRepo.constructed().get(0).findById(mockSession, 5L)).thenReturn(Optional.of(dummyOrg));
             when(mockStaffRepo.constructed().get(0).findByEmail(mockSession, "new@h.it")).thenReturn(Optional.of(target));
@@ -240,7 +245,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Stato Macchina: Valutazione Approva -> Sostituisce ruolo e salva")
+        @DisplayName("State Machine: Approve Request -> Creates Assignment")
         void testEvaluateRoleRequestApprove() {
             RoleRequest req = new RoleRequest(dummyHackathon, dummyOrg, StaffRole.JUDGE);
             setEntityId(req, 77L);
@@ -254,6 +259,32 @@ class ServiceHandlersTest {
             assertEquals(RequestState.APPROVED, req.getState());
             verify(mockAssignRepo.constructed().get(0), times(1)).save(eq(mockSession), any(StaffAssignment.class));
             verify(mockRoleReqRepo.constructed().get(0), times(1)).save(mockSession, req);
+        }
+
+        @Test
+        @DisplayName("State Machine: Deny Request -> Only updates state")
+        void testEvaluateRoleRequestDeny() {
+            RoleRequest req = new RoleRequest(dummyHackathon, dummyOrg, StaffRole.JUDGE);
+            setEntityId(req, 77L);
+
+            when(mockRoleReqRepo.constructed().get(0).findById(mockSession, 77L)).thenReturn(Optional.of(req));
+
+            handler.evaluateRoleRequest(77L, false);
+
+            assertEquals(RequestState.DENIED, req.getState());
+            verify(mockAssignRepo.constructed().get(0), never()).save(any(), any());
+        }
+
+        @Test
+        @DisplayName("State Machine: Fail if request is not PENDING")
+        void testEvaluateAlreadyProcessed() {
+            RoleRequest req = new RoleRequest(dummyHackathon, dummyOrg, StaffRole.JUDGE);
+            setEntityId(req, 77L);
+            req.setState(RequestState.DENIED);
+
+            when(mockRoleReqRepo.constructed().get(0).findById(mockSession, 77L)).thenReturn(Optional.of(req));
+
+            assertThrows(IllegalStateException.class, () -> handler.evaluateRoleRequest(77L, true));
         }
     }
 
@@ -286,7 +317,7 @@ class ServiceHandlersTest {
             mockAssignRepo = mockConstruction(StaffAssignmentRepository.class);
             handler = new SubmissionHandler();
 
-            dummyDelivery = new StandardDelivery("Traccia 1");
+            dummyDelivery = new StandardDelivery("Task 1");
             setEntityId(dummyDelivery, 50L);
             dummyPT = new ParticipatingTeam(dummyTeam, dummyHackathon);
             setEntityId(dummyPT, 88L);
@@ -299,7 +330,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Invio: Nuova sottomissione con URL GitHub Valido")
+        @DisplayName("Send: New submission with valid GitHub URL")
         void testSendSubmissionNew() {
             dummyHackathon.setExecutionStartDate(LocalDate.now());
             dummyHackathon.setExecutionEndDate(LocalDate.now());
@@ -318,7 +349,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Invio: Fallisce se la stringa non è un URL GitHub")
+        @DisplayName("Send: Fail if URL is not a valid GitHub URL")
         void testSendSubmissionInvalidUrl() {
             dummyHackathon.setExecutionStartDate(LocalDate.now());
             dummyHackathon.setExecutionEndDate(LocalDate.now());
@@ -329,12 +360,11 @@ class ServiceHandlersTest {
             when(mockPartTeamRepo.constructed().get(0).findByTeamAndHackathon(mockSession, 10L, 100L)).thenReturn(Optional.of(dummyPT));
             when(mockDelivRepo.constructed().get(0).findById(mockSession, 50L)).thenReturn(Optional.of(dummyDelivery));
 
-            // Questa stringa farà lanciare un'eccezione dal costruttore di GitHubUrl all'interno dell'handler
-            assertThrows(IllegalArgumentException.class, () -> handler.sendSubmission(100L, 50L, 1L, "link-invalido"));
+            assertThrows(IllegalArgumentException.class, () -> handler.sendSubmission(100L, 50L, 1L, "invalid-link"));
         }
 
         @Test
-        @DisplayName("Invio: Aggiornamento URL GitHub (Upsert)")
+        @DisplayName("Send: Update existing submission (Upsert)")
         void testSendSubmissionUpdateExisting() {
             dummyHackathon.setExecutionStartDate(LocalDate.now());
             dummyHackathon.setExecutionEndDate(LocalDate.now());
@@ -356,10 +386,52 @@ class ServiceHandlersTest {
             assertEquals(validUrl, existingSub.getRepositoryUrl().getValue());
             verify(mockSubRepo.constructed().get(0), times(1)).save(mockSession, existingSub);
         }
+
+        @Test
+        @DisplayName("Security: Fail if Hackathon is not in execution")
+        void testSendSubmissionNotInExecution() {
+            dummyHackathon.setExecutionStartDate(LocalDate.now().plusDays(2));
+            when(mockHackRepo.constructed().get(0).findById(mockSession, 100L)).thenReturn(Optional.of(dummyHackathon));
+
+            assertThrows(IllegalStateException.class, () -> handler.sendSubmission(100L, 50L, 1L, validUrl));
+        }
+
+        @Test
+        @DisplayName("Judge View: Success if assigned to event")
+        void testGetSubmissionsByStaffWithAccess() {
+            StaffProfile judge = new StaffProfile("Mario", "Rossi", new Email("j@h.it"), null, StaffRole.JUDGE);
+            StaffAssignment assignment = new StaffAssignment(judge, dummyHackathon, StaffRole.JUDGE);
+            List<StaffAssignment> assignments = new ArrayList<>();
+            assignments.add(assignment);
+
+            when(mockStaffRepo.constructed().get(0).findById(mockSession, 3L)).thenReturn(Optional.of(judge));
+            when(mockAssignRepo.constructed().get(0).findByStaffProfile(mockSession, 3L)).thenReturn(assignments);
+
+            assertDoesNotThrow(() -> handler.getHackathonSubmissions(100L, 3L));
+            verify(mockSubRepo.constructed().get(0), times(1)).getByHackathonIdOrderedByDelivery(mockSession, 100L);
+        }
+
+        @Test
+        @DisplayName("Judge View: Fail if staff is NOT assigned")
+        void testGetSubmissionsByStaffNoAccess() {
+            StaffProfile judge = new StaffProfile("Mario", "Rossi", new Email("j@h.it"), null, StaffRole.JUDGE);
+
+            Hackathon otherHackathon = new Hackathon();
+            setEntityId(otherHackathon, 999L);
+
+            StaffAssignment assignment = new StaffAssignment(judge, otherHackathon, StaffRole.JUDGE);
+            List<StaffAssignment> assignments = new ArrayList<>();
+            assignments.add(assignment);
+
+            when(mockStaffRepo.constructed().get(0).findById(mockSession, 3L)).thenReturn(Optional.of(judge));
+            when(mockAssignRepo.constructed().get(0).findByStaffProfile(mockSession, 3L)).thenReturn(assignments);
+
+            assertThrows(IllegalAccessError.class, () -> handler.getHackathonSubmissions(100L, 3L));
+        }
     }
 
     @Nested
-    @DisplayName("4. TeamHandler Tests (Creazione e Inviti)")
+    @DisplayName("4. TeamHandler Tests (Creation & Invites)")
     class TeamHandlerTests {
         private MockedConstruction<UserRepository> mockUserRepo;
         private MockedConstruction<TeamRepository> mockTeamRepo;
@@ -380,7 +452,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Limiti: La creazione del team fallisce se il nome esiste già")
+        @DisplayName("Fail: Team name already exists")
         void testCreateTeamNameExists() {
             when(mockUserRepo.constructed().get(0).findById(mockSession, 1L)).thenReturn(Optional.of(dummyLeader));
             when(mockTeamRepo.constructed().get(0).getTeamOfUser(mockSession, 1L)).thenReturn(Optional.empty());
@@ -390,7 +462,7 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Sicurezza: L'invito fallisce se inviato da un NON leader")
+        @DisplayName("Security: Invite fails if user is NOT leader")
         void testInviteNotLeader() {
             User target = new User("Target", new Email("t@h.it"), new UserPassword("Pwd12345!"));
 
@@ -403,7 +475,7 @@ class ServiceHandlersTest {
     }
 
     @Nested
-    @DisplayName("5. HackathonRequestHandler Tests (Approvazione Evento)")
+    @DisplayName("5. HackathonRequestHandler Tests (Workflow)")
     class HackathonRequestHandlerTests {
         private MockedConstruction<HackathonRequestRepository> mockReqRepo;
         private MockedConstruction<AdminRepository> mockAdminRepo;
@@ -426,37 +498,63 @@ class ServiceHandlersTest {
         }
 
         @Test
-        @DisplayName("Creazione: L'Organizzatore invia la proposta di Hackathon")
-        void testSubmitRequest() {
+        @DisplayName("Submit: Organizer sends request and Builder creates Hackathon")
+        void testSubmitRequestWithBuilder() {
+            Info info = new Info("New Hack", "Type", "Loc", 1000.0, true);
+            Period exec = new Period(LocalDateTime.now().plusDays(10), LocalDateTime.now().plusDays(12));
+            Period sub = new Period(LocalDateTime.now(), LocalDateTime.now().plusDays(5));
+            Rules rules = new Rules(4, "Rules Text");
+
             when(mockStaffRepo.constructed().get(0).findById(mockSession, 5L)).thenReturn(Optional.of(dummyOrg));
 
-            assertDoesNotThrow(() -> handler.submitHackathonRequest(5L, dummyHackathon));
+            assertDoesNotThrow(() -> handler.submitHackathonRequest(
+                    5L, info, exec, sub, rules, ResponseType.SOFTWARE, new ArrayList<>()
+            ));
 
-            verify(mockHackRepo.constructed().get(0), times(1)).save(mockSession, dummyHackathon);
+            verify(mockHackRepo.constructed().get(0), times(1)).save(eq(mockSession), any(Hackathon.class));
             verify(mockReqRepo.constructed().get(0), times(1)).save(eq(mockSession), any(HackathonRequest.class));
         }
 
         @Test
-        @DisplayName("Valutazione: L'Admin approva la richiesta")
-        void testEvaluateApprove() {
+        @DisplayName("Approve: Admin approves PENDING request")
+        void testApproveRequest() {
             HackathonRequest req = new HackathonRequest(dummyHackathon, dummyOrg);
             setEntityId(req, 88L);
 
-            when(mockAdminRepo.constructed().get(0).findById(mockSession, 999L)).thenReturn(Optional.of(dummyAdmin));
             when(mockReqRepo.constructed().get(0).findById(mockSession, 88L)).thenReturn(Optional.of(req));
 
-            handler.evaluateHackathonRequest(999L, 88L, true);
+            handler.approveRequest(88L);
 
             assertEquals(RequestState.APPROVED, req.getState());
             verify(mockReqRepo.constructed().get(0), times(1)).save(mockSession, req);
         }
 
         @Test
-        @DisplayName("Sicurezza: Un utente NON Admin non può valutare")
-        void testEvaluateNotAdmin() {
-            when(mockAdminRepo.constructed().get(0).findById(mockSession, 1L)).thenReturn(Optional.empty()); // Utente 1 non è admin
+        @DisplayName("Decline: Admin declines PENDING request")
+        void testDeclineRequest() {
+            HackathonRequest req = new HackathonRequest(dummyHackathon, dummyOrg);
+            setEntityId(req, 88L);
 
-            assertThrows(IllegalAccessError.class, () -> handler.evaluateHackathonRequest(1L, 88L, true));
+            when(mockReqRepo.constructed().get(0).findById(mockSession, 88L)).thenReturn(Optional.of(req));
+
+            handler.declineRequest(88L, "Not good enough");
+
+            assertEquals(RequestState.DENIED, req.getState());
+            verify(mockReqRepo.constructed().get(0), times(1)).save(mockSession, req);
+        }
+
+        @Test
+        @DisplayName("Query: getPendingRequests uses HQL")
+        void testGetPendingRequests() {
+            Query mockedQuery = mock(Query.class);
+            when(mockSession.createQuery(anyString(), eq(HackathonRequest.class))).thenReturn(mockedQuery);
+            when(mockedQuery.setParameter(anyString(), any())).thenReturn(mockedQuery);
+            when(mockedQuery.list()).thenReturn(Collections.emptyList());
+
+            List<HackathonRequest> result = handler.getPendingRequests();
+
+            assertNotNull(result);
+            verify(mockSession, times(1)).createQuery(contains("FROM HackathonRequest"), eq(HackathonRequest.class));
         }
     }
 
@@ -464,7 +562,6 @@ class ServiceHandlersTest {
         try {
             java.lang.reflect.Field idField = null;
             Class<?> currentClass = entity.getClass();
-
             while (currentClass != null && idField == null) {
                 try {
                     idField = currentClass.getDeclaredField("id");
@@ -472,16 +569,11 @@ class ServiceHandlersTest {
                     currentClass = currentClass.getSuperclass();
                 }
             }
-
-            if (idField == null) {
-                fail("Impossibile trovare il campo 'id' nell'entità " + entity.getClass().getSimpleName());
-            }
-
+            if (idField == null) fail("ID field not found in class hierarchy");
             idField.setAccessible(true);
             idField.set(entity, id);
-
         } catch (Exception e) {
-            throw new RuntimeException("Errore durante il setting dell'ID via Reflection", e);
+            throw new RuntimeException("Error setting ID via reflection", e);
         }
     }
 }

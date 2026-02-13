@@ -1,26 +1,29 @@
 package it.hackhub.service.builder;
 
-import it.hackhub.model.Delivery;
+import it.hackhub.model.DeliveryTmp;
 import it.hackhub.model.Hackathon;
-import java.time.LocalDate;
+import it.hackhub.model.enums.ResponseType;
+import it.hackhub.model.valueobjs.Info;
+import it.hackhub.model.valueobjs.Period;
+import it.hackhub.model.valueobjs.Rules;
+
+import java.util.List;
 
 public interface IHackathonBuilder {
 
     void reset();
 
-    void buildGeneralInfo(String name, String type, String prize, boolean isOnline, String location);
+    void buildGeneralInfo(Info infos);
 
-    void buildExecutionDates(LocalDate start, LocalDate end);
+    void buildExecutionDates(Period period);
 
-    void buildSubscriptionDates(LocalDate start, LocalDate end);
+    void buildSubscriptionDates(Period period);
 
-    void validateDates();
+    void buildRules(Rules rules);
 
-    void buildRules(int maxTeamSize, String ruleDocument);
+    void buildResponseType(ResponseType responseType);
 
-    void buildResponseType(String responseType);
-
-    void addDelivery(Delivery delivery);
+    void addDeliveries(List<DeliveryTmp> deliveries);
 
     Hackathon getResult();
 }

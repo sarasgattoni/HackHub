@@ -1,12 +1,27 @@
 package it.hackhub.service.builder;
 
-import it.hackhub.model.Hackathon;
-import it.hackhub.model.Delivery;
-import java.time.LocalDate;
+import it.hackhub.model.*;
+import it.hackhub.model.enums.ResponseType;
+import it.hackhub.model.validators.HackathonDomainValidator;
+import it.hackhub.model.valueobjs.Info;
+import it.hackhub.model.valueobjs.Period;
+import it.hackhub.model.valueobjs.Rules;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class HackathonConcreteBuilder implements IHackathonBuilder {
 
     private Hackathon hackathon;
+
+    private Info info;
+    private Period executionPeriod;
+    private Period subscriptionPeriod;
+    private Rules rules;
+    private ResponseType responseType;
+    private List<DeliveryTmp> deliveriesTmp;
+
+    private final HackathonDomainValidator validator = new HackathonDomainValidator();
 
     public HackathonConcreteBuilder() {
         this.reset();
@@ -15,64 +30,79 @@ public class HackathonConcreteBuilder implements IHackathonBuilder {
     @Override
     public void reset() {
         this.hackathon = new Hackathon();
+        this.deliveriesTmp = new ArrayList<>();
+        this.info = null;
+        this.executionPeriod = null;
+        this.subscriptionPeriod = null;
+        this.rules = null;
+        this.responseType = null;
     }
 
     @Override
-    public void buildGeneralInfo(String name, String type, String prize, boolean isOnline, String location) {
-        hackathon.setName(name);
-        hackathon.setType(type);
-        hackathon.setPrize(prize);
-        hackathon.setOnline(isOnline);
-        hackathon.setLocation(location);
+    public void buildGeneralInfo(Info info) {
+        this.info = info;
     }
 
     @Override
-    public void buildExecutionDates(LocalDate start, LocalDate end) {
-        hackathon.setExecutionStartDate(start);
-        hackathon.setExecutionEndDate(end);
+    public void buildExecutionDates(Period period) {
+        this.executionPeriod = period;
     }
 
     @Override
-    public void buildSubscriptionDates(LocalDate start, LocalDate end) {
-        hackathon.setSubscriptionStartDate(start);
-        hackathon.setSubscriptionEndDate(end);
+    public void buildSubscriptionDates(Period period) {
+        this.subscriptionPeriod = period;
     }
 
     @Override
-    public void validateDates() {
-        if (hackathon.getSubscriptionStartDate() == null || hackathon.getExecutionStartDate() == null) {
-            throw new IllegalArgumentException("Le date non possono essere nulle.");
+    public void buildRules(Rules rules) {
+        this.rules = rules;
+    }
+
+    @Override
+    public void buildResponseType(ResponseType responseType) {
+        this.responseType = responseType;
+    }
+
+    @Override
+    public void addDeliveries(List<DeliveryTmp> deliveries) {
+        if (deliveries != null) {
+            this.deliveriesTmp = deliveries;
         }
-
-        if (hackathon.getSubscriptionEndDate() != null &&
-                hackathon.getSubscriptionEndDate().isAfter(hackathon.getExecutionStartDate())) {
-            throw new IllegalStateException("Le iscrizioni devono terminare prima dell'inizio dell'esecuzione.");
-        }
-
-        if (hackathon.getExecutionEndDate() != null &&
-                hackathon.getExecutionStartDate().isAfter(hackathon.getExecutionEndDate())) {
-            throw new IllegalStateException("La data di fine non può essere precedente a quella di inizio.");
-        }
-    }
-
-    @Override
-    public void buildRules(int maxTeamSize, String ruleDocument) {
-        hackathon.setMaxTeamSize(maxTeamSize);
-        hackathon.setRuleDocument(ruleDocument);
-    }
-
-    @Override
-    public void buildResponseType(String responseType) {
-        hackathon.setResponseType(responseType);
-    }
-
-    @Override
-    public void addDelivery(Delivery delivery) {
-        hackathon.addDelivery(delivery);
     }
 
     @Override
     public Hackathon getResult() {
+        validator.validateAll(info, rules, executionPeriod, subscriptionPeriod, responseType, deliveriesTmp);
+
+        hackathon.setName(info.getName());
+        hackathon.setType(info.getType());
+        hackathon.setPrize(String.valueOf(info.getPrize()));
+        hackathon.setOnline(info.isOnline());
+
+        hackathon.setMaxTeamSize(rules.getMaxTeamMembers());
+        hackathon.setRuleDocument(rules.getRulesText());
+
+        hackathon.setExecutionStartDate(executionPeriod.getStartDate().toLocalDate());
+        hackathon.setExecutionEndDate(executionPeriod.getEndDate().toLocalDate());
+        hackathon.setSubscriptionStartDate(subscriptionPeriod.getStartDate().toLocalDate());
+        hackathon.setSubscriptionEndDate(subscriptionPeriod.getEndDate().toLocalDate());
+
+        hackathon.setResponseType(responseType.name());
+
+        if (deliveriesTmp != null) {
+            for (DeliveryTmp tmp : deliveriesTmp) {
+                Delivery deliveryEntity;
+
+                if (responseType == ResponseType.FLAG) {
+                    deliveryEntity = new FlagDelivery(tmp.getText(), tmp.getSolution());
+                } else {
+                    deliveryEntity = new StandardDelivery(tmp.getText());
+                }
+
+                hackathon.addDelivery(deliveryEntity);
+            }
+        }
+
         Hackathon product = this.hackathon;
         this.reset();
         return product;

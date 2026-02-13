@@ -1,57 +1,101 @@
 package it.hackhub.service;
 
-import it.hackhub.model.Admin;
+import it.hackhub.model.DeliveryTmp;
 import it.hackhub.model.Hackathon;
 import it.hackhub.model.HackathonRequest;
 import it.hackhub.model.StaffProfile;
 import it.hackhub.model.enums.RequestState;
+import it.hackhub.model.enums.ResponseType;
 import it.hackhub.model.utils.HibernateExecutor;
-import it.hackhub.repository.AdminRepository;
+import it.hackhub.model.valueobjs.Info;
+import it.hackhub.model.valueobjs.Period;
+import it.hackhub.model.valueobjs.Rules;
 import it.hackhub.repository.HackathonRepository;
 import it.hackhub.repository.HackathonRequestRepository;
 import it.hackhub.repository.StaffProfileRepository;
+import it.hackhub.service.builder.HackathonConcreteBuilder;
+import it.hackhub.service.builder.IHackathonBuilder;
+
+import java.util.List;
 
 public class HackathonRequestHandler {
 
-    private final HackathonRequestRepository requestRepo = new HackathonRequestRepository();
-    private final AdminRepository adminRepo = new AdminRepository();
-    private final StaffProfileRepository staffRepo = new StaffProfileRepository();
     private final HackathonRepository hackathonRepo = new HackathonRepository();
+    private final HackathonRequestRepository hackathonRequestRepo = new HackathonRequestRepository();
+    private final StaffProfileRepository staffRepo = new StaffProfileRepository();
 
-    public void submitHackathonRequest(Long organizerId, Hackathon newHackathon) {
+
+    public List<HackathonRequest> getPendingRequests() {
+        return HibernateExecutor.execute(session ->
+                session.createQuery("FROM HackathonRequest r WHERE r.state = :state", HackathonRequest.class)
+                        .setParameter("state", RequestState.PENDING)
+                        .list()
+        );
+    }
+
+    public HackathonRequest getRequestDetail(Long requestId) {
+        return HibernateExecutor.execute(session ->
+                hackathonRequestRepo.findById(session, requestId)
+                        .orElseThrow(() -> new IllegalArgumentException("Request not found with ID: " + requestId))
+        );
+    }
+
+    public void declineRequest(Long requestId, String reason) {
         HibernateExecutor.executeVoidTransaction(session -> {
+            HackathonRequest request = hackathonRequestRepo.findById(session, requestId)
+                    .orElseThrow(() -> new IllegalArgumentException("Request not found."));
 
-            StaffProfile organizer = staffRepo.findById(session, organizerId)
-                    .orElseThrow(() -> new IllegalArgumentException("StaffProfile not found"));
+            if (request.getState() != RequestState.PENDING) {
+                throw new IllegalStateException("Cannot decline: request is not in PENDING state.");
+            }
+
+            request.setState(RequestState.DENIED);
+
+            hackathonRequestRepo.save(session, request);
+        });
+    }
+
+    public void approveRequest(Long requestId) {
+        HibernateExecutor.executeVoidTransaction(session -> {
+            HackathonRequest request = hackathonRequestRepo.findById(session, requestId)
+                    .orElseThrow(() -> new IllegalArgumentException("Request not found."));
+
+            if (request.getState() != RequestState.PENDING) {
+                throw new IllegalStateException("Cannot approve: request is not in PENDING state.");
+            }
+
+            request.setState(RequestState.APPROVED);
+            hackathonRequestRepo.save(session, request);
+        });
+    }
+
+    public void submitHackathonRequest(Long staffProfileId,
+                                       Info info,
+                                       Period hackathonPeriod,
+                                       Period subscriptionPeriod,
+                                       Rules rules,
+                                       ResponseType responseType,
+                                       List<DeliveryTmp> deliveriesTmp) {
+
+        HibernateExecutor.executeVoidTransaction(session -> {
+            StaffProfile organizer = staffRepo.findById(session, staffProfileId)
+                    .orElseThrow(() -> new IllegalArgumentException("Staff profile not found."));
+
+            IHackathonBuilder builder = new HackathonConcreteBuilder();
+
+            builder.buildGeneralInfo(info);
+            builder.buildExecutionDates(hackathonPeriod);
+            builder.buildSubscriptionDates(subscriptionPeriod);
+            builder.buildRules(rules);
+            builder.buildResponseType(responseType);
+            builder.addDeliveries(deliveriesTmp);
+
+            Hackathon newHackathon = builder.getResult();
 
             hackathonRepo.save(session, newHackathon);
 
             HackathonRequest request = new HackathonRequest(newHackathon, organizer);
-
-            requestRepo.save(session, request);
-        });
-    }
-
-    public void evaluateHackathonRequest(Long adminId, Long requestId, boolean isAccepted) {
-        HibernateExecutor.executeVoidTransaction(session -> {
-
-            Admin admin = adminRepo.findById(session, adminId)
-                    .orElseThrow(() -> new IllegalAccessError("Only admins can perform this action"));
-
-            HackathonRequest request = requestRepo.findById(session, requestId)
-                    .orElseThrow(() -> new IllegalArgumentException("Request not found"));
-
-            if (request.getState() != RequestState.PENDING) {
-                throw new IllegalStateException("This request has already been considered");
-            }
-
-            if (isAccepted) {
-                request.setState(RequestState.APPROVED);
-            } else {
-                request.setState(RequestState.DENIED);
-            }
-
-            requestRepo.save(session, request);
+            hackathonRequestRepo.save(session, request);
         });
     }
 }
