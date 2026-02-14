@@ -1,12 +1,9 @@
 package it.hackhub.service;
 
-import it.hackhub.model.DeliveryTmp;
-import it.hackhub.model.Hackathon;
-import it.hackhub.model.HackathonRequest;
-import it.hackhub.model.StaffProfile;
-import it.hackhub.model.enums.HackathonState;
+import it.hackhub.model.*;
 import it.hackhub.model.enums.RequestState;
 import it.hackhub.model.enums.ResponseType;
+import it.hackhub.model.enums.StaffRole;
 import it.hackhub.model.utils.HibernateExecutor;
 import it.hackhub.model.valueobjs.Info;
 import it.hackhub.model.valueobjs.Period;
@@ -49,15 +46,17 @@ public class HackathonRequestHandler {
                 throw new IllegalStateException("Cannot decline: request is not in PENDING state.");
             }
 
-            request.setState(RequestState.DENIED);
+            request.setState(RequestState.DECLINED);
 
-            Hackathon hackathon = request.getHackathon();
-            if (hackathon != null) {
-                hackathon.setState(HackathonState.REJECTED);
-                hackathonRepo.save(session, hackathon);
+            Hackathon hackathonToDelete = request.getHackathon();
+
+            if (hackathonToDelete != null) {
+                request.setHackathon(null);
+                hackathonRequestRepo.save(session, request);
+                hackathonRepo.delete(session, hackathonToDelete);
+            } else {
+                hackathonRequestRepo.save(session, request);
             }
-
-            hackathonRequestRepo.save(session, request);
         });
     }
 
@@ -74,7 +73,7 @@ public class HackathonRequestHandler {
 
             Hackathon hackathon = request.getHackathon();
             if (hackathon != null) {
-                hackathon.setState(HackathonState.APPROVED);
+                hackathon.nextState();
                 hackathonRepo.save(session, hackathon);
             }
 
@@ -105,12 +104,12 @@ public class HackathonRequestHandler {
 
             Hackathon newHackathon = builder.getResult();
 
-            newHackathon.setState(HackathonState.PENDING);
+            StaffAssignment organizerAssignment = new StaffAssignment(organizer, newHackathon, StaffRole.ORGANIZER);
+            newHackathon.addStaffAssignment(organizerAssignment);
 
             hackathonRepo.save(session, newHackathon);
 
             HackathonRequest request = new HackathonRequest(newHackathon, organizer);
-
             hackathonRequestRepo.save(session, request);
         });
     }

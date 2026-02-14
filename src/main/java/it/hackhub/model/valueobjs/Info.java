@@ -27,11 +27,11 @@ public class Info {
     public Info(String name, String type, String subtype, double prize, boolean isOnline) {
 
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("The name of the it.hackhub.model.Hackathon is obligatory");
+            throw new IllegalArgumentException("The name of the Hackathon is obligatory");
         }
 
         if (prize < 0) {
-            throw new IllegalArgumentException("The prize of the it.hackhub.model.Hackathon can't be negative");
+            throw new IllegalArgumentException("The prize of the Hackathon can't be negative");
         }
 
         this.name = name;
@@ -40,4 +40,9 @@ public class Info {
         this.prize = prize;
         this.isOnline = isOnline;
     }
+
+    public String getLocation() {
+        return isOnline ? "Online" : "Offline";
+    }
+
 }

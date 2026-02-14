@@ -30,4 +30,13 @@ public class Rules {
         this.maxTeamMembers = maxTeamMembers;
         this.rulesText = rulesText;
     }
+
+    public int getMaxTeamSize() {
+        return this.maxTeamMembers;
+    }
+
+    public String getRuleDocument() {
+        return this.rulesText;
+    }
+
 }

@@ -8,6 +8,7 @@ import lombok.Setter;
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "delivery_type")
 public abstract class Delivery {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     protected Long id;
@@ -19,4 +20,8 @@ public abstract class Delivery {
     @JoinColumn(name = "hackathon_id")
     @Setter @Getter
     protected Hackathon hackathon;
+
+    public Object getId() {
+        return id;
+    }
 }

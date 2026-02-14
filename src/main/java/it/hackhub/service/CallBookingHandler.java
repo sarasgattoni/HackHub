@@ -43,7 +43,7 @@ public class CallBookingHandler {
             if (isAccepted) {
                 request.setState(RequestState.APPROVED);
             } else {
-                request.setState(RequestState.DENIED);
+                request.setState(RequestState.DECLINED);
             }
 
             callReqRepo.save(session, request);

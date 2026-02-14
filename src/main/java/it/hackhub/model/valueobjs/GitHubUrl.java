@@ -23,4 +23,8 @@ public class GitHubUrl {
         }
         this.value = value;
     }
+
+    public String getUrl() {
+        return this.value;
+    }
 }
