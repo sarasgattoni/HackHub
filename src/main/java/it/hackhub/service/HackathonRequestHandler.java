@@ -4,6 +4,7 @@ import it.hackhub.model.DeliveryTmp;
 import it.hackhub.model.Hackathon;
 import it.hackhub.model.HackathonRequest;
 import it.hackhub.model.StaffProfile;
+import it.hackhub.model.enums.HackathonState;
 import it.hackhub.model.enums.RequestState;
 import it.hackhub.model.enums.ResponseType;
 import it.hackhub.model.utils.HibernateExecutor;
@@ -23,7 +24,6 @@ public class HackathonRequestHandler {
     private final HackathonRepository hackathonRepo = new HackathonRepository();
     private final HackathonRequestRepository hackathonRequestRepo = new HackathonRequestRepository();
     private final StaffProfileRepository staffRepo = new StaffProfileRepository();
-
 
     public List<HackathonRequest> getPendingRequests() {
         return HibernateExecutor.execute(session ->
@@ -51,6 +51,12 @@ public class HackathonRequestHandler {
 
             request.setState(RequestState.DENIED);
 
+            Hackathon hackathon = request.getHackathon();
+            if (hackathon != null) {
+                hackathon.setState(HackathonState.REJECTED);
+                hackathonRepo.save(session, hackathon);
+            }
+
             hackathonRequestRepo.save(session, request);
         });
     }
@@ -65,6 +71,13 @@ public class HackathonRequestHandler {
             }
 
             request.setState(RequestState.APPROVED);
+
+            Hackathon hackathon = request.getHackathon();
+            if (hackathon != null) {
+                hackathon.setState(HackathonState.APPROVED);
+                hackathonRepo.save(session, hackathon);
+            }
+
             hackathonRequestRepo.save(session, request);
         });
     }
@@ -92,9 +105,12 @@ public class HackathonRequestHandler {
 
             Hackathon newHackathon = builder.getResult();
 
+            newHackathon.setState(HackathonState.PENDING);
+
             hackathonRepo.save(session, newHackathon);
 
             HackathonRequest request = new HackathonRequest(newHackathon, organizer);
+
             hackathonRequestRepo.save(session, request);
         });
     }

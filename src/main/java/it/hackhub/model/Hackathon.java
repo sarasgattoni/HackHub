@@ -1,5 +1,6 @@
 package it.hackhub.model;
 
+import it.hackhub.model.enums.HackathonState;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -38,6 +39,9 @@ public class Hackathon {
 
     @OneToMany(mappedBy = "hackathon", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Delivery> deliveries = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    private HackathonState state = HackathonState.PENDING;
 
     public void addDelivery(Delivery delivery) {
         deliveries.add(delivery);

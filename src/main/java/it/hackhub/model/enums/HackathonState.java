@@ -2,6 +2,7 @@ package it.hackhub.model.enums;
 
 public enum HackathonState {
     PENDING,
+    REJECTED,
     APPROVED,
     SUBSCRIPTION_OPEN,
     IN_EXECUTION,
@@ -11,6 +12,7 @@ public enum HackathonState {
     public boolean allows(HackathonAction action) {
         switch (this) {
             case PENDING:
+            case REJECTED:
             case APPROVED:
                 return action == HackathonAction.MANAGE_STAFF;
 
