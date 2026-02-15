@@ -1,5 +1,6 @@
 package it.hackhub.model;
 
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.enums.StaffRole;
 import jakarta.persistence.*;
 import lombok.Getter;

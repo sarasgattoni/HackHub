@@ -2,7 +2,7 @@ package it.hackhub.model.state;
 
 import it.hackhub.model.Hackathon;
 import it.hackhub.model.StaffAssignment;
-import it.hackhub.model.StaffProfile;
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.enums.StaffRole;
 
 public class ApprovedState implements IHackathonState {

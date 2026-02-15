@@ -1,6 +1,6 @@
 package it.hackhub.repository;
 
-import it.hackhub.model.User;
+import it.hackhub.model.accounts.User;
 import org.hibernate.Session;
 import java.util.Optional;
 

@@ -1,7 +1,7 @@
 package it.hackhub.model.state;
 
 import it.hackhub.model.Hackathon;
-import it.hackhub.model.StaffProfile;
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.Submission;
 import java.util.List;
 

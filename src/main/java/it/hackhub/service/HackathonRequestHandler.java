@@ -1,6 +1,7 @@
 package it.hackhub.service;
 
 import it.hackhub.model.*;
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.enums.RequestState;
 import it.hackhub.model.enums.ResponseType;
 import it.hackhub.model.enums.StaffRole;

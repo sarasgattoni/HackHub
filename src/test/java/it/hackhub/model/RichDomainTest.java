@@ -1,5 +1,7 @@
 package it.hackhub.model;
 
+import it.hackhub.model.accounts.StaffProfile;
+import it.hackhub.model.accounts.User;
 import it.hackhub.model.enums.StaffRole;
 import it.hackhub.model.state.*;
 import org.junit.jupiter.api.BeforeEach;

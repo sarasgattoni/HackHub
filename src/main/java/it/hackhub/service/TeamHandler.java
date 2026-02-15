@@ -1,54 +1,53 @@
 package it.hackhub.service;
 
-import it.hackhub.model.*;
+import it.hackhub.model.notifications.InviteNotificationFactory;
+import it.hackhub.model.notifications.NotificationFactory;
+import it.hackhub.model.notifications.SystemNotificationFactory;
+import it.hackhub.model.Team;
+import it.hackhub.model.accounts.User;
 import it.hackhub.model.utils.HibernateExecutor;
-import it.hackhub.repository.*;
+import it.hackhub.repository.TeamRepository;
+import it.hackhub.repository.UserRepository;
 
 public class TeamHandler {
 
-    private final UserRepository userRepo = new UserRepository();
     private final TeamRepository teamRepo = new TeamRepository();
-    private final JoinTeamRequestRepository joinReqRepo = new JoinTeamRequestRepository();
+    private final UserRepository userRepo = new UserRepository();
 
-    public void createTeam(Long userId, String teamName) {
+    public void createTeam(Long creatorId, String teamName) {
         HibernateExecutor.executeVoidTransaction(session -> {
-
-            User user = userRepo.findById(session, userId)
+            User creator = userRepo.findById(session, creatorId)
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-            if (teamRepo.getTeamOfUser(session, userId).isPresent()) {
-                throw new IllegalStateException("User already in another team");
-            }
+            Team team = new Team(teamName, creator);
 
-            if (teamRepo.existsByName(session, teamName)) {
-                throw new IllegalArgumentException("Team name is already used");
-            }
-
-            Team team = new Team(teamName, user);
+            NotificationFactory sysFactory = new SystemNotificationFactory();
+            creator.notify(sysFactory, "Hai creato con successo il team: " + teamName);
 
             teamRepo.save(session, team);
         });
     }
 
-    public void inviteUserToTeam(Long senderId, String recipientUsername) {
+    public void inviteMemberToTeam(Long leaderId, Long teamId, Long targetUserId) {
         HibernateExecutor.executeVoidTransaction(session -> {
+            Team team = teamRepo.findById(session, teamId)
+                    .orElseThrow(() -> new IllegalArgumentException("Team not found"));
 
-            User recipient = userRepo.findByUsername(session, recipientUsername)
-                    .orElseThrow(() -> new IllegalArgumentException("Receiver not found"));
+            User leader = userRepo.findById(session, leaderId)
+                    .orElseThrow(() -> new IllegalArgumentException("Leader not found"));
 
-            User sender = userRepo.findById(session, senderId)
-                    .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
-
-            Team team = teamRepo.getTeamOfUser(session, senderId)
-                    .orElseThrow(() -> new IllegalStateException("Sender is not in a team"));
-
-            if (!team.isLeader(sender)) {
-                throw new IllegalStateException("Only team leader can send invites");
+            if (!team.isLeader(leader)) {
+                throw new IllegalStateException("Only the team leader can invite people");
             }
 
-            JoinTeamRequest request = new JoinTeamRequest(team, recipient);
+            User target = userRepo.findById(session, targetUserId)
+                    .orElseThrow(() -> new IllegalArgumentException("Target user not found"));
 
-            joinReqRepo.save(session, request);
+            NotificationFactory inviteFactory = new InviteNotificationFactory(team.getId());
+
+            target.notify(inviteFactory, "You have been invited to join " + team.getName());
+
+            userRepo.save(session, target);
         });
     }
 }

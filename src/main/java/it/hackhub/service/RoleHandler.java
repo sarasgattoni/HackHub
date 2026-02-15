@@ -1,95 +1,70 @@
 package it.hackhub.service;
 
+import it.hackhub.model.accounts.StaffProfile;
+import it.hackhub.model.notifications.InviteNotificationFactory;
+import it.hackhub.model.notifications.NotificationFactory;
 import it.hackhub.model.*;
-import it.hackhub.model.enums.RequestState;
 import it.hackhub.model.enums.StaffRole;
+import it.hackhub.model.notifications.Notification;
 import it.hackhub.model.utils.HibernateExecutor;
 import it.hackhub.repository.*;
 
-import java.util.Optional;
-
 public class RoleHandler {
 
-    private final StaffProfileRepository staffRepo = new StaffProfileRepository();
     private final HackathonRepository hackathonRepo = new HackathonRepository();
-    private final RoleRequestRepository roleReqRepo = new RoleRequestRepository();
-    private final StaffAssignmentRepository staffAssignRepo = new StaffAssignmentRepository();
+    private final StaffProfileRepository staffRepo = new StaffProfileRepository();
+    private final NotificationRepository notifRepo = new NotificationRepository();
 
-    public void sendRoleRequest(Long organizerId, String targetEmail, Long hackathonId, StaffRole roleToAssign) {
+    public void inviteStaffMember(Long organizerId, Long hackathonId, String targetEmail, StaffRole role) {
         HibernateExecutor.executeVoidTransaction(session -> {
+            Hackathon hackathon = hackathonRepo.findById(session, hackathonId)
+                    .orElseThrow(() -> new IllegalArgumentException("Hackathon not found"));
 
             StaffProfile organizer = staffRepo.findById(session, organizerId)
                     .orElseThrow(() -> new IllegalArgumentException("Organizer not found"));
+
+            if (!hackathon.isOrganizer(organizer)) {
+                throw new SecurityException("Solo l'organizzatore può invitare staff.");
+            }
 
             StaffProfile target = staffRepo.findByEmail(session, targetEmail)
-                    .orElseThrow(() -> new IllegalArgumentException("Nominee not found with this email"));
+                    .orElseThrow(() -> new IllegalArgumentException("Nessun profilo staff trovato con questa email."));
 
-            Hackathon hackathon = hackathonRepo.findById(session, hackathonId)
-                    .orElseThrow(() -> new IllegalArgumentException("Hackathon not found"));
+            NotificationFactory notifFactory = new InviteNotificationFactory(hackathonId, role.name());
+            Notification notification = notifFactory.createNotification(
+                    target,
+                    "Sei stato invitato all'hackathon " + hackathon.getName()
+            );
 
-            assertIsOrganizer(session, organizerId, hackathonId);
-
-            hackathon.assertApprovedOrSubscription();
-
-            RoleRequest request = new RoleRequest(hackathon, target, roleToAssign);
-
-            roleReqRepo.save(session, request);
         });
     }
 
-    public void selfAssignRole(Long organizerId, Long hackathonId, StaffRole roleToAssign) {
+    public void finalizeStaffing(Long hackathonId, Long organizerId) {
         HibernateExecutor.executeVoidTransaction(session -> {
+            Hackathon hackathon = hackathonRepo.findById(session, hackathonId)
+                    .orElseThrow(() -> new IllegalArgumentException("Hackathon not found"));
 
             StaffProfile organizer = staffRepo.findById(session, organizerId)
                     .orElseThrow(() -> new IllegalArgumentException("Organizer not found"));
 
-            Hackathon hackathon = hackathonRepo.findById(session, hackathonId)
-                    .orElseThrow(() -> new IllegalArgumentException("Hackathon not found"));
+            if (!hackathon.isOrganizer(organizer)) {
+                throw new SecurityException("Solo l'organizzatore può finalizzare lo staff.");
+            }
 
-            assertIsOrganizer(session, organizerId, hackathonId);
-            hackathon.assertApprovedOrSubscription();
+            if (!hasAssignedRole(hackathon, StaffRole.JUDGE)) {
+                hackathon.recruitStaff(organizer, organizer, StaffRole.JUDGE);
+            }
 
-            replaceAndAssignRole(session, organizer, hackathon, roleToAssign);
+            if (!hasAssignedRole(hackathon, StaffRole.MENTOR)) {
+                hackathon.recruitStaff(organizer, organizer, StaffRole.MENTOR);
+            }
+
+            hackathonRepo.save(session, hackathon);
         });
     }
 
-    public void evaluateRoleRequest(Long requestId, boolean isAccepted) {
-        HibernateExecutor.executeVoidTransaction(session -> {
-
-            RoleRequest request = roleReqRepo.findById(session, requestId)
-                    .orElseThrow(() -> new IllegalArgumentException("Request not found"));
-
-            if (request.getState() != RequestState.PENDING) {
-                throw new IllegalStateException("The request has already been processed");
-            }
-
-            if (isAccepted) {
-                replaceAndAssignRole(session, request.getCandidate(), request.getHackathon(), request.getRole());
-                request.setState(RequestState.APPROVED);
-            } else {
-                request.setState(RequestState.DENIED);
-            }
-
-            roleReqRepo.save(session, request);
-        });
-    }
-
-    private void assertIsOrganizer(org.hibernate.Session session, Long staffId, Long hackathonId) {
-        Optional<StaffAssignment> orgAssignment = staffAssignRepo.findByHackathonAndRole(session, hackathonId, StaffRole.ORGANIZER);
-
-        if (orgAssignment.isEmpty() || !orgAssignment.get().getStaffProfile().getId().equals(staffId)) {
-            throw new IllegalAccessError("Only the Hackathon Organizer can nominate staff");
-        }
-    }
-
-    private void replaceAndAssignRole(org.hibernate.Session session, StaffProfile newStaff, Hackathon hackathon, StaffRole role) {
-
-        Optional<StaffAssignment> existingAssignment = staffAssignRepo.findByHackathonAndRole(session, hackathon.getId(), role);
-
-        existingAssignment.ifPresent(assignment -> staffAssignRepo.delete(session, assignment));
-
-        StaffAssignment newAssignment = new StaffAssignment(newStaff, hackathon, role);
-
-        staffAssignRepo.save(session, newAssignment);
+    private boolean hasAssignedRole(Hackathon h, StaffRole role) {
+        return h.getStaffAssignments().stream()
+                .anyMatch(sa -> sa.getRole() == role);
     }
 }

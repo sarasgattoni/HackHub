@@ -1,5 +1,6 @@
 package it.hackhub.model;
 
+import it.hackhub.model.accounts.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

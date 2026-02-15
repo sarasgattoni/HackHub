@@ -2,7 +2,7 @@ package it.hackhub.model.state;
 
 import it.hackhub.model.Hackathon;
 import it.hackhub.model.ParticipatingTeam;
-import it.hackhub.model.StaffProfile;
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.Team;
 import java.util.List;
 

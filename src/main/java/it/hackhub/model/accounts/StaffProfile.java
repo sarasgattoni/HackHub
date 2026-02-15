@@ -1,4 +1,4 @@
-package it.hackhub.model;
+package it.hackhub.model.accounts;
 
 import it.hackhub.model.enums.StaffRole;
 import it.hackhub.model.valueobjs.Email;

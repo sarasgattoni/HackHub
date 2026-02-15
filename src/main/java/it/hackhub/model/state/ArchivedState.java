@@ -1,7 +1,7 @@
 package it.hackhub.model.state;
 
 import it.hackhub.model.Hackathon;
-import it.hackhub.model.StaffProfile;
+import it.hackhub.model.accounts.StaffProfile;
 import java.util.List;
 
 public class ArchivedState implements IHackathonState {

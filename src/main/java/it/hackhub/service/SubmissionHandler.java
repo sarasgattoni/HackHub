@@ -1,6 +1,7 @@
 package it.hackhub.service;
 
 import it.hackhub.model.*;
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.utils.HibernateExecutor;
 import it.hackhub.repository.*;
 import java.util.List;

@@ -1,6 +1,7 @@
 package it.hackhub.model.state;
 
 import it.hackhub.model.*;
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.valueobjs.GitHubUrl;
 import java.util.List;
 

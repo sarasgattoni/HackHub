@@ -1,6 +1,7 @@
 package it.hackhub.model.state;
 
 import it.hackhub.model.*;
+import it.hackhub.model.accounts.StaffProfile;
 import it.hackhub.model.enums.StaffRole;
 import java.io.Serializable;
 import java.util.List;

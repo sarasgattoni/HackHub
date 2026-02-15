@@ -1,6 +1,7 @@
 package it.hackhub.service;
 
 import it.hackhub.model.*;
+import it.hackhub.model.accounts.User;
 import it.hackhub.model.utils.HibernateExecutor;
 import it.hackhub.repository.*;
 
